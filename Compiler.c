@@ -141,6 +141,12 @@ int IDget(char* input){
 		else if (strcmp(input, "copy") == 0){
 			return COPY;
 		}
+		else if (strcmp(input, "declare") == 0){
+			return DECLARE;
+		}
+		else if (strcmp(input, "enddeclare") == 0){
+			return ENDDECLARE;
+		}
 		else if (strcmp(input, "<=")==0){
 			return LESS_EQ;
 		}
@@ -320,8 +326,8 @@ void programtk(){
 	if (id == PROGRAM){
 		id = IDget(lexis);
 		if (id == ID){
-			id IDget(lexis);
-			programBlock();
+			id = IDget(lexis);
+			Block();
 		}
 		else{
 			error("Syntax error:Program name expected");
@@ -332,6 +338,42 @@ void programtk(){
 	}
 }
 
+void Block(){
+	if (id == OPEN_BRAC){
+		id = IDget(lexis);
+		Declarations();
+		Subprograms();
+		Sequence();
+		if (id == CLOSE_BRAC){
+			id = IDget(lexis);
+		}
+		else{
+			error("Syntax error: \"}\" expected after \"{\"");
+		}
+	}
+	else{
+		error("Syntax error: \"{\" expected");
+	}
+}
+
+void Declarations(){
+	if (id == DECLARE){
+		id = IDget(lexis);
+		varlist();
+		if (id == ENDDECLARE){
+			id = IDget(lexis);
+		}
+		else{
+			error("Syntax error: \"enddeclare\" expected");
+		}
+	}
+}
+
+void varlist(){
+	while (id == ID){
+		id = IDget(lexis);
+	}
+}
 
 int main(int argc, char *argv[]){
 
