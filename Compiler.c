@@ -13,6 +13,7 @@ int state = state0;
 int id,i,counter=0;
 char lexis[500];
 char c,b;
+FILE *fp;
 int isAcceptable(char c)
 {
 
@@ -324,58 +325,262 @@ int lex(FILE *fp){
 
 void programtk(){
 	if (id == PROGRAM){
-		id = IDget(lexis);
+		id = lex(fp);
 		if (id == ID){
-			id = IDget(lexis);
-			Block();
+			id = lex(fp);
+			block();
 		}
 		else{
-			error("Syntax error:Program name expected");
+			perror("Syntax error in line %d:Program name expected" ,lineNum);
 		}
 	}
 	else{
-		error("Syntax error: word \" program \" expected");
+		perror("Syntax error in line %d: word \" program \" expected", lineNum);
 	}
 }
 
-void Block(){
+void block(){
 	if (id == OPEN_BRAC){
-		id = IDget(lexis);
-		Declarations();
-		Subprograms();
-		Sequence();
+		id = lex(fp);
+		declarations();
+		subprograms();
+		sequence();
 		if (id == CLOSE_BRAC){
-			id = IDget(lexis);
+			id = lex(fp);
 		}
 		else{
-			error("Syntax error: \"}\" expected after \"{\"");
+			perror("Syntax error in line %d: \"}\" expected after \"{\"",lineNum);
 		}
 	}
 	else{
-		error("Syntax error: \"{\" expected");
+		perror("Syntax error in line %d: \"{\" expected",lineNum);
 	}
 }
 
-void Declarations(){
+void declarations(){
 	if (id == DECLARE){
-		id = IDget(lexis);
+		id = lex(fp);
 		varlist();
 		if (id == ENDDECLARE){
-			id = IDget(lexis);
+			id = lex(fp);
 		}
 		else{
-			error("Syntax error: \"enddeclare\" expected");
+			perror("Syntax error in line %d: \"enddeclare\" expected",lineNum);
 		}
 	}
 }
 
 void varlist(){
-	while (id == ID){
-		id = IDget(lexis);
+	if (id == ID){
+		id = lex(fp);
+		while (id == COMMA){
+			id = lex(fp);
+			if (id == ID){
+				id = lex(fp);
+			}
+			else{
+				perror("Syntax error in line %d: ID after \",\"",lineNum);
+			}
+		}
 	}
 }
 
-int main(int argc, char *argv[]){
+void subprogram(){
+	while (id == FUNCTION){
+		id = lex(fp);
+		function();
+	}
+}
+
+void function(){
+	if (id == PROCEDURE){
+		id = lex(fp);
+		if (id == ID){
+			id = lex(fp);
+			funcbody();
+		}
+		else{
+			perror("Syntax error in line %d: expected ID after procedure", lineNum);
+		}
+	}
+	else if (id == FUNCTION){
+		id = lex(fp);
+		if (id == ID){
+			id = lex(fp);
+			funcbody();
+		}
+		else{
+			perror("Syntax error in line %d: expected ID after function", lineNum);
+		}
+	}
+	else{
+		perror("Syntax error in line %d: expected \"procedure\" or \"function\" keywords",lineNum);
+	}
+}
+
+void funcbody(){
+	formalpars();
+	block();
+}
+
+void formalpars(){
+	if (id == OPEN_PAR){
+		id = lex(fp);
+		formalparlist();
+		if (id == CLOSE_PAR){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected closed parenthesis\n", lineNum);
+		}
+	}
+}
+
+void formalparlist(){
+	formalparitem();
+	id = lex(fp);
+	while (id == COMMA){
+		formalparitem();
+		id = lex(fp);
+	}
+}
+
+void formalparitem(){
+	if (id == IN){
+		id = lex(fp);
+		if (id == ID){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected ID after \"in\"\n", lineNum);
+		}
+	}
+	else if (id == INOUT){
+		id = lex(fp);
+		if (id == ID){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected ID after \"inout\"\n", lineNum);
+		}
+	}
+	else if (id == COPY){
+		id = lex(fp);
+		if (id == ID){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected ID after \"copy\"\n", lineNum);
+		}
+	}
+}
+
+void sequence(){
+	statement();
+	id = lex(fp);
+	if (id == SEMI_COL){
+		statement();
+		id = lex(fp);
+		while (id == SEMI_COL)
+		{
+			statement();
+			id = lex(fp);
+		}
+	}
+}
+
+void brackets_seq(){
+	if (id == OPEN_BRAC){
+		sequence();
+		if (id == CLOSE_BRAC){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected closed brackets\n", lineNum);
+		}
+	}
+}
+
+void brack_or_stat(){
+	if (id == OPEN_BRAC){
+		brackets_seq();
+	}
+	else{
+		sequence();
+		//id = lex(fp) NOT SURE IF NEEDED!!!!!!!!!!!!!!!
+	}
+}
+
+void statement(){
+	if (id == ID){
+		assignment_stat();
+	}
+	else if (id == IF){
+		if_stat();
+	}
+	else if (id == WHILE){
+		while_stat();
+	}
+	else if (id == DO){
+		do_while_stat();
+	}
+	else if (id == EXIT){
+		exit_stat();
+	}
+	else if (id == INCASE){
+		incase_stat();
+	}
+	else if (id == FORCASE){
+		forcase_stat();
+	}
+	else if (id == CALL){
+		call_stat();
+	}
+	else if (id == RETURN){
+		return_stat();
+	}
+	else if (id == PRINT){
+		print_stat();
+	}
+}
+
+void assignment_stat(){
+	if (id == ID){
+		id = lex(fp);
+		if (id == DECL_EQUALS){
+			expression();
+		}
+		else{
+			perror("Syntax error in line %d: expected \":=\" after ID\n", lineNum);
+		}
+	}
+}
+
+void if_stat(){
+	if (id == IF){
+		id = lex(fp);
+		if (id == OPEN_PAR){
+			condition();
+			id = lex(fp);
+			if (id == CLOSE_PAR){
+				id = lex(fp);
+				brack_or_stat();
+				elsepart();
+			}
+		}
+		else{
+			perror("Syntax error in line %d: no open parenthesis before condition\n", lineNum);
+		}
+	}
+}
+
+void elsepart(){
+	if (id == ELSE){
+		id = lex(fp);
+		brack_or_stat();
+	}
+}
+/*int main(int argc, char *argv[]){
 
 	FILE *fp;
 
@@ -398,4 +603,4 @@ int main(int argc, char *argv[]){
 	}
 	fclose(fp);
 
-}
+}*/
