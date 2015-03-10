@@ -148,6 +148,9 @@ int IDget(char* input){
 		else if (strcmp(input, "enddeclare") == 0){
 			return ENDDECLARE;
 		}
+		else if (strcmp(input, "CONSTANT") == 0){
+			return CONSTANTID;
+		}
 		else if (strcmp(input, "<=")==0){
 			return LESS_EQ;
 		}
@@ -580,6 +583,396 @@ void elsepart(){
 		brack_or_stat();
 	}
 }
+
+void do_while_stat(){
+
+	if (id == DO){
+		brack_or_stat();
+		if (id == WHILE){
+			id = lex(fp);
+			if (id == OPEN_PAR){
+				condition();
+				id = lex(fp);
+				if (id == CLOSE_PAR){
+					id = lex(fp);
+				}
+				else{
+					perror("Syntax error in line %d: no close parenthesis after condition\n", lineNum);
+				}
+			}
+			else{
+				perror("Syntax error in line %d: no open parenthesis before condition\n", lineNum);
+			}
+		}
+		else{
+			perror("Syntax error in line %d: expected keyword \"while\"\n", lineNum);
+		}
+	}
+}
+
+void exit_stat(){
+	if (id == EXIT){
+		id = lex(fp);
+	}
+	else{
+		perror("Syntax error in line %d: expected keyword \"exit\"\n", lineNum);
+	}
+}
+
+void return_stat(){
+	if (id == RETURN){
+		id = lex(fp);
+		if (id == OPEN_PAR){
+			expression();
+			if (id == CLOSE_PAR){
+				id = lex(fp);
+			}
+			else{
+				perror("Syntax error in line %d: closed parenthesis expected after expression\n", lineNum);
+			}
+		}
+		else{
+			perror("Syntax error in line %d: opened parenthesis expected after \"return\"\n", lineNum);
+		}
+	}
+}
+void print_stat(){
+	if (id == PRINT){
+		id = lex(fp);
+		if (id == OPEN_PAR){
+			expression();
+			if (id == CLOSE_PAR){
+				id = lex(fp);
+			}
+			else{
+				perror("Syntax error in line %d: closed parenthesis expected after expression\n", lineNum);
+			}
+		}
+		else{
+			perror("Syntax error in line %d: opened parenthesis expected after \"print\"\n", lineNum);
+		}
+	}
+}
+
+void while_stat(){
+
+	
+	if (id == WHILE){
+		id = lex(fp);
+		if (id == OPEN_PAR){
+			condition();
+			id = lex(fp);
+			if (id == CLOSE_PAR){
+				brack_or_stat();
+			}
+			else{
+				perror("Syntax error in line %d: no closed parenthesis after condition\n", lineNum);
+			}
+		}
+		else{
+			perror("Syntax error in line %d: no opened parenthesis before condition\n", lineNum);
+		}
+		
+	}
+}
+
+void incase_stat(){
+	if (id == INCASE){
+		id = lex(fp);
+		if (id == OPEN_BRAC){
+			id = lex(fp);
+			while (id == WHEN){
+				id = lex(fp);
+				if (id == OPEN_PAR){
+					condition();
+					id = lex(fp);
+					if (id == CLOSE_PAR){
+						brack_or_stat();
+					}
+					else{
+						perror("Syntax error in line %d: closed parenthesis expected\n", lineNum);
+					}
+				}
+				else{
+					perror("Syntax error in line %d: opened parenthesis expected\n", lineNum);
+				}
+			}
+			if (id == CLOSE_BRAC){
+				id = lex(fp);
+			}
+			else{
+				perror("Syntax error in line %d: closed bracket expected\n", lineNum);
+			}
+		}
+		else{
+			perror("Syntax error in line %d: opened bracket expected\n", lineNum);
+		}
+	}
+}
+
+void forcase_stat(){
+	if (id == FORCASE){
+		id = lex(fp);
+		if (id == OPEN_BRAC){
+			id = lex(fp);
+			while (id == WHEN){
+				id = lex(fp);
+				if (id == OPEN_PAR){
+					condition();
+					id = lex(fp);
+					if (id == CLOSE_PAR){
+						brack_or_stat();
+					}
+					else{
+						perror("Syntax error in line %d: closed parenthesis expected\n", lineNum);
+					}
+				}
+				else{
+					perror("Syntax error in line %d: opened parenthesis expected\n", lineNum);
+				}
+			}
+			if (id == CLOSE_BRAC){
+				id = lex(fp);
+			}
+			else{
+				perror("Syntax error in line %d: closed bracket expected\n", lineNum);
+			}
+		}
+		else{
+			perror("Syntax error in line %d: opened bracket expected\n", lineNum);
+		}
+	}
+}
+
+void call_stat(){
+	if (id == CALL){
+		id = lex(fp);
+		if (id == ID){
+			id = lex(fp);
+			if (id == OPEN_PAR){
+				actualpars();
+				id = lex(fp);
+				if (id == CLOSE_PAR){
+					id = lex(fp);
+				}
+				else{
+					perror("Syntax error in line %d: closed parenthesis expected\n", lineNum);
+				}
+			}
+			else{
+				perror("Syntax error in line %d: opened parenthesis expected\n", lineNum);
+			}
+		}
+		else{
+			perror("Syntax error in line %d: ID expected\n", lineNum);
+		}
+	}
+	else{
+		perror("Syntax error in line %d: \"call\" keyword expected\n", lineNum);
+	}
+}
+
+void actualpars(){
+	if (id == OPEN_PAR){
+		id = lex(fp);
+		actualparlist();
+		if (id == CLOSE_PAR){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected closed parenthesis\n", lineNum);
+		}
+	}
+}
+
+void actualparlist(){
+	actualparitem();
+	id = lex(fp);
+	while (id == COMMA){
+		actualparitem();
+		id = lex(fp);
+	}
+}
+
+void actualparitem(){
+	if (id == IN){
+		expression();
+	}
+	else if (id == INOUT){
+		id = lex(fp);
+		if (id == ID){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected ID after \"inout\"\n", lineNum);
+		}
+	}
+	else if (id == COPY){
+		id = lex(fp);
+		if (id == ID){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected ID after \"copy\"\n", lineNum);
+		}
+	}
+}
+
+void condition(){
+	boolterm();
+	id = lex(fp);
+	if (id == OR){
+		boolterm();
+		id = lex(fp);
+		while (id == OR)
+		{
+			boolterm();
+			id = lex(fp);
+		}
+	}
+}
+
+void boolterm(){
+	boolfactor();
+	id = lex(fp);
+	if (id == AND){
+		boolfactor();
+		id = lex(fp);
+		while (id == AND)
+		{
+			boolfactor();
+			id = lex(fp);
+		}
+	}
+}
+
+void boolfactor(){
+	if (id == NOT){
+		id = lex(fp);
+		if (id == OSQUARE_BRAC){
+			conditon();
+			if (id == CSQUARE_BRAC){
+				id = lex(fp);
+			}
+			else{
+				perror("Syntax error in line %d: expected ]\n", lineNum);
+			}
+		}
+		else{
+			perror("Syntax error in line %d: expected [\n", lineNum);
+		}
+	}
+	else if (id == OSQUARE_BRAC){
+		conditon();
+		if (id == CSQUARE_BRAC){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected ]\n", lineNum);
+		}
+	}
+	else{
+		expression();
+		relational_oper();
+		expression();
+	}
+}
+
+void expression(){
+	optional_sign();
+	term();
+	while (id == PLUS || id == MINUS){
+		addoper();
+		term();
+	}
+	
+
+}
+
+void term(){
+	factor();
+	//id = lex(fp);
+	while (id == MULTIPLY|| id == DIVIDE){
+		mul_oper();
+		factor();
+		//id = lex(fp);
+	}
+}
+
+void factor(){
+	if (id == CONSTANTID){
+		id = lex(fp);
+	}
+	else if (id == OPEN_PAR){
+		expression();
+		if (id == CLOSE_PAR){
+			id = lex(fp);
+		}
+		else{
+			perror("Syntax error in line %d: expected )\n", lineNum);
+		}
+	}
+	else if (id == ID){
+		idtail();
+	}
+	else{
+		perror("Syntax error in line %d: contstant | () | ID\n", lineNum);
+	}
+}
+
+void idtail(){
+	actualpars();
+}
+
+void relational_oper(){
+	if (id == EQUALS){
+		id = lex(fp);
+	}
+	else if (id == GREATER_THAN){
+		id = lex(fp);
+	}
+	else if (id == LESS_THAN){
+		id = lex(fp);
+	}
+	else if (id == GREATER_EQ){
+		id = lex(fp);
+	}
+	else if (id == LESS_EQ){
+		id = lex(fp);
+	}
+	else if (id == DIFFERENT){
+		id = lex(fp);
+	}
+}
+
+void add_oper(){
+	if (id == PLUS){
+		id = lex(fp);
+	}
+	else if (id == MINUS){
+		id = lex(fp);
+	}
+}
+
+void mul_oper(){
+	if (id == MULTIPLY){
+		id = lex(fp);
+	}
+	else if (id == DIVIDE){
+		id = lex(fp);
+	}
+}
+
+void optional_sign(){
+	add_oper();
+}
+
+
+
+
+
+
+
 /*int main(int argc, char *argv[]){
 
 	FILE *fp;
