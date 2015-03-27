@@ -10,9 +10,10 @@
 
 int lineNum = 1;
 int state = state0;
-int id,i,counter=0;
+int id,i,token;
 char lexis[500];
 char c,b;
+
 FILE *fp;
 int isAcceptable(char c)
 {
@@ -24,57 +25,60 @@ int isAcceptable(char c)
 }
 
 int IDget(char* input){
-	if (strlen(input) == 1 && !isdigit(input) && !isalpha(input)){
-		if (input == "="){
+    /*if (strcmp(input,"+")==0){
+        return PLUS;
+    }*/
+
+		if (strcmp(input, "=")==0){
 			return EQUALS;
 		}
-		else if (input == "+"){
+		else if (strcmp(input,"+")==0){
 			return PLUS;
 		}
-		else if (input == "*"){
+		else if (strcmp(input,"*")==0){
 			return MULTIPLY;
 		}
-		else if (input == "/"){
+		else if (strcmp(input,"/")==0){
 			return DIVIDE;
 		}
-		else if (input == "-"){
+		else if (strcmp(input,"-")==0){
 			return MINUS;
 		}
-		else if (input == "<"){
+		else if (strcmp(input,"<")==0){
 			return LESS_THAN;
 		}
-		else if (input==">"){
+		else if (strcmp(input,">")==0){
 			return GREATER_THAN;
 		}
-		else if (input == ";"){
+		else if (strcmp(input,";")==0){
 			return SEMI_COL;
 		}
-		else if (input == ","){
+		else if (strcmp(input,",")==0){
 			return COMMA;
 		}
-		else if (input == "("){
+		else if (strcmp(input,"(")==0){
 			return OPEN_PAR;
 		}
-		else if (input == ")"){
+		else if (strcmp(input,")")==0){
 			return CLOSE_PAR;
 		}
-		else if (input == "{"){
+		else if (strcmp(input,"{")==0){
 			return OPEN_BRAC;
 		}
-		else if (input == "}"){
+		else if (strcmp(input,"}")==0){
 			return CLOSE_BRAC;
 		}
-		else if (input == "["){
+		else if (strcmp(input,"[")==0){
 			return OSQUARE_BRAC;
 		}
-		else if (input == "]"){
+		else if (strcmp(input,"]")==0){
 			return CSQUARE_BRAC;
 		}
-	}
+
 	else if (isdigit(input[0])){
 		return NUMERIC;
 	}
-	else{
+	else if(strlen(input)>=1){
 
 		if (strcmp(input, "if") == 0){
 			return IF;
@@ -171,19 +175,16 @@ int IDget(char* input){
 }
 
 int lex(FILE *fp){
-    strcpy(lexis,"");
+
 
 	state = state0;
 	i=0;
-	fseek(fp,counter,SEEK_SET);
-	c = fgetc(fp);
-	counter++;
+
+
 	while (state != OK && state != ERROR){
+        c = fgetc(fp);
 		if (c == '\n') {
 			lineNum++;
-		}
-		else if (state == state0 && c == EOF){
-			state = OK;
 		}
 		else if (state == state0 && isspace(c)){
 			state = state0;
@@ -195,12 +196,11 @@ int lex(FILE *fp){
 		else if (state == state1 && (isalpha(c) || isdigit(c))){
 			state = state1;
 			lexis[i++] = c;
-			
+
 		}
 		else if (state == state1 && !(isalpha(c) || isdigit(c))){
 			state = OK;
 			ungetc(c, fp);
-			counter--;
 		}
 		else if (state == state0 && isdigit(c)){
 			state = state2;
@@ -210,15 +210,14 @@ int lex(FILE *fp){
 			state = state2;
 			lexis[i++] = c;
 		}
-		else if (state == state2 && isdigit(c)){
+		else if (state == state2 && !isdigit(c)){
 			state = OK;
 			ungetc(c, fp);
-			counter--;
 		}
 		else if (state == state0 && c == '<'){
 			state = state3;
 			lexis[i++] = c;
-			
+
 		}
 		else if (state == state3 && c == '>'){
 			state = OK;
@@ -232,53 +231,55 @@ int lex(FILE *fp){
 			state = state4;
 			lexis[i++] = c;
 		}
+		else if (state == state0 && c == '='){
+			state = OK;
+			lexis[i++] = c;
+		}
 		else if (state == state4 && c == '='){
 			state = OK;
 			lexis[i++] = c;
 		}
 		else if (state == state3 && c != '>'&& c != '='){
 			state = OK;
+			lexis[i++]=c;
 			ungetc(c, fp);
-			counter--;
-		}
+        }
 		else if (state == state4 &&  c != '='){
 			state = OK;
+			lexis[i++]=c;
 			ungetc(c, fp);
-			counter--;
-			break;
 		}
 		else if (state == state0 && c == ':'){
+            lexis[i++]=c;
 			state = state5;
 		}
 		else if (state == state5 && c == '='){
+            lexis[i++]=c;
 			state = OK;
 		}
 		else if (state == state5 && c != '='){
 			printf("Error in %d line, expected \"=\" after \":\"  ", lineNum);
 			state = ERROR;
 		}
-		else if (state == state0 && c == '*'){
+        else if (state == state0 && c == '*'){
+            lexis[i++] = c;
 			c=fgetc(fp);
-			counter++;
-			if(c=='/'){
-				printf("Error in %d line, excpected \"/*\" before \"*/\" ", lineNum);
-	
+			if(c=='\\'){
+				printf("Error in %d line, excpected \"\\*\" before \"*\\\" ", lineNum);
 				state = ERROR;
 			}
 			else{
 				ungetc(c,fp);
-				counter--;
 				state = OK;
 			}
 		}
-		else if (state == state0 && c=='/'){
+		else if (state == state0 && c=='\\'){
 			c=fgetc(fp);
 			if(c=='*'){
 				state = state6;
 			}
 			else{
 				ungetc(c,fp);
-				counter--;
 				state=OK;
 			}
 		}
@@ -287,46 +288,46 @@ int lex(FILE *fp){
 		}
 		else if (state == state6 && c=='*'){
 			c=fgetc(fp);
-			counter++;
-			if(c=='/'){
+			if(c=='\\'){
 				state = state0;
 			}
 			else{
 				ungetc(c,fp);
-				counter--;
 			}
 		}
-		else if (isAcceptable(c)){
+		else if (isAcceptable(c)==1){
+            lexis[i++]=c;
 			state = OK;
+
 		}
 		else {
 			state = ERROR;
 		}
-		c = fgetc(fp);
-		counter++;	
-		
+		if(c==EOF){
+            return -1;
+        }
 	}
+    printf("lexis %s\n",lexis);
 
 	if (state == ERROR){
+        memset( lexis, 0, sizeof(lexis) );
 		return -999;
 	}
 	id = IDget(lexis);
 	if (id == NUMERIC){
-
 		if (atoi(lexis) < (-32768) && (atoi(lexis) > 32768)){
-
 			printf("Error in line %d ,Strange supports number range between -32768 and 32768 ",lineNum);
+			memset( lexis, 0, sizeof(lexis) );
 			return -998;
 		}
 	}
-	if(c==EOF){
-		return -1;
-	}
+	memset( lexis, 0, sizeof(lexis) );
 	return id;
 
 }
 
 void programtk(){
+    id = lex(fp);
 	if (id == PROGRAM){
 		id = lex(fp);
 		if (id == ID){
@@ -334,41 +335,43 @@ void programtk(){
 			block();
 		}
 		else{
-			perror("Syntax error in line %d:Program name expected" ,lineNum);
+			printf("Syntax error in line %d:Program name expected" ,lineNum);
 		}
 	}
 	else{
-		perror("Syntax error in line %d: word \" program \" expected", lineNum);
+		printf("Syntax error in line %d: word \" program \" expected", lineNum);
 	}
 }
 
 void block(){
 	if (id == OPEN_BRAC){
-		id = lex(fp);
-		declarations();
-		subprograms();
+        declarations();
+		subprogram();
 		sequence();
+		printf("my id %d\n",id);
 		if (id == CLOSE_BRAC){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: \"}\" expected after \"{\"",lineNum);
+			printf("Syntax error in line %d: \"}\" expected after \"{\"\n",lineNum);
 		}
 	}
 	else{
-		perror("Syntax error in line %d: \"{\" expected",lineNum);
+		printf("Syntax error in line %d: \"{\" expected\n",lineNum);
 	}
 }
 
 void declarations(){
+    id = lex(fp);
 	if (id == DECLARE){
 		id = lex(fp);
 		varlist();
+		//id = lex(fp);
 		if (id == ENDDECLARE){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: \"enddeclare\" expected",lineNum);
+			printf("Syntax error in line %d: \"enddeclare\" expected\n",lineNum);
 		}
 	}
 }
@@ -382,20 +385,20 @@ void varlist(){
 				id = lex(fp);
 			}
 			else{
-				perror("Syntax error in line %d: ID after \",\"",lineNum);
+				printf("Syntax error in line %d: ID after \",\"\n",lineNum);
 			}
 		}
 	}
 }
 
 void subprogram(){
-	while (id == FUNCTION){
-		id = lex(fp);
+	while (id == FUNCTION || id == PROCEDURE){
 		function();
 	}
 }
 
 void function(){
+    printf("my id is %d",id);
 	if (id == PROCEDURE){
 		id = lex(fp);
 		if (id == ID){
@@ -403,7 +406,7 @@ void function(){
 			funcbody();
 		}
 		else{
-			perror("Syntax error in line %d: expected ID after procedure", lineNum);
+			printf("Syntax error in line %d: expected ID after procedure", lineNum);
 		}
 	}
 	else if (id == FUNCTION){
@@ -413,11 +416,11 @@ void function(){
 			funcbody();
 		}
 		else{
-			perror("Syntax error in line %d: expected ID after function", lineNum);
+			printf("Syntax error in line %d: expected ID after function", lineNum);
 		}
 	}
 	else{
-		perror("Syntax error in line %d: expected \"procedure\" or \"function\" keywords",lineNum);
+		printf("Syntax error in line %d: expected \"procedure\" or \"function\" keywords",lineNum);
 	}
 }
 
@@ -434,7 +437,7 @@ void formalpars(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected closed parenthesis\n", lineNum);
+			printf("Syntax error in line %d: expected closed parenthesis\n", lineNum);
 		}
 	}
 }
@@ -455,7 +458,7 @@ void formalparitem(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected ID after \"in\"\n", lineNum);
+			printf("Syntax error in line %d: expected ID after \"in\"\n", lineNum);
 		}
 	}
 	else if (id == INOUT){
@@ -464,7 +467,7 @@ void formalparitem(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected ID after \"inout\"\n", lineNum);
+			printf("Syntax error in line %d: expected ID after \"inout\"\n", lineNum);
 		}
 	}
 	else if (id == COPY){
@@ -473,7 +476,7 @@ void formalparitem(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected ID after \"copy\"\n", lineNum);
+			printf("Syntax error in line %d: expected ID after \"copy\"\n", lineNum);
 		}
 	}
 }
@@ -499,7 +502,7 @@ void brackets_seq(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected closed brackets\n", lineNum);
+			printf("Syntax error in line %d: expected closed brackets\n", lineNum);
 		}
 	}
 }
@@ -548,13 +551,14 @@ void statement(){
 }
 
 void assignment_stat(){
+    //id=lex(fp);
 	if (id == ID){
 		id = lex(fp);
 		if (id == DECL_EQUALS){
 			expression();
 		}
 		else{
-			perror("Syntax error in line %d: expected \":=\" after ID\n", lineNum);
+			printf("Syntax error in line %d: expected \":=\" after ID\n", lineNum);
 		}
 	}
 }
@@ -572,7 +576,7 @@ void if_stat(){
 			}
 		}
 		else{
-			perror("Syntax error in line %d: no open parenthesis before condition\n", lineNum);
+			printf("Syntax error in line %d: no open parenthesis before condition\n", lineNum);
 		}
 	}
 }
@@ -597,15 +601,15 @@ void do_while_stat(){
 					id = lex(fp);
 				}
 				else{
-					perror("Syntax error in line %d: no close parenthesis after condition\n", lineNum);
+					printf("Syntax error in line %d: no close parenthesis after condition\n", lineNum);
 				}
 			}
 			else{
-				perror("Syntax error in line %d: no open parenthesis before condition\n", lineNum);
+				printf("Syntax error in line %d: no open parenthesis before condition\n", lineNum);
 			}
 		}
 		else{
-			perror("Syntax error in line %d: expected keyword \"while\"\n", lineNum);
+			printf("Syntax error in line %d: expected keyword \"while\"\n", lineNum);
 		}
 	}
 }
@@ -615,7 +619,7 @@ void exit_stat(){
 		id = lex(fp);
 	}
 	else{
-		perror("Syntax error in line %d: expected keyword \"exit\"\n", lineNum);
+		printf("Syntax error in line %d: expected keyword \"exit\"\n", lineNum);
 	}
 }
 
@@ -628,11 +632,11 @@ void return_stat(){
 				id = lex(fp);
 			}
 			else{
-				perror("Syntax error in line %d: closed parenthesis expected after expression\n", lineNum);
+				printf("Syntax error in line %d: closed parenthesis expected after expression\n", lineNum);
 			}
 		}
 		else{
-			perror("Syntax error in line %d: opened parenthesis expected after \"return\"\n", lineNum);
+			printf("Syntax error in line %d: opened parenthesis expected after \"return\"\n", lineNum);
 		}
 	}
 }
@@ -645,18 +649,18 @@ void print_stat(){
 				id = lex(fp);
 			}
 			else{
-				perror("Syntax error in line %d: closed parenthesis expected after expression\n", lineNum);
+				printf("Syntax error in line %d: closed parenthesis expected after expression\n", lineNum);
 			}
 		}
 		else{
-			perror("Syntax error in line %d: opened parenthesis expected after \"print\"\n", lineNum);
+			printf("Syntax error in line %d: opened parenthesis expected after \"print\"\n", lineNum);
 		}
 	}
 }
 
 void while_stat(){
 
-	
+
 	if (id == WHILE){
 		id = lex(fp);
 		if (id == OPEN_PAR){
@@ -666,13 +670,13 @@ void while_stat(){
 				brack_or_stat();
 			}
 			else{
-				perror("Syntax error in line %d: no closed parenthesis after condition\n", lineNum);
+				printf("Syntax error in line %d: no closed parenthesis after condition\n", lineNum);
 			}
 		}
 		else{
-			perror("Syntax error in line %d: no opened parenthesis before condition\n", lineNum);
+			printf("Syntax error in line %d: no opened parenthesis before condition\n", lineNum);
 		}
-		
+
 	}
 }
 
@@ -690,22 +694,22 @@ void incase_stat(){
 						brack_or_stat();
 					}
 					else{
-						perror("Syntax error in line %d: closed parenthesis expected\n", lineNum);
+						printf("Syntax error in line %d: closed parenthesis expected\n", lineNum);
 					}
 				}
 				else{
-					perror("Syntax error in line %d: opened parenthesis expected\n", lineNum);
+					printf("Syntax error in line %d: opened parenthesis expected\n", lineNum);
 				}
 			}
 			if (id == CLOSE_BRAC){
 				id = lex(fp);
 			}
 			else{
-				perror("Syntax error in line %d: closed bracket expected\n", lineNum);
+				printf("Syntax error in line %d: closed bracket expected\n", lineNum);
 			}
 		}
 		else{
-			perror("Syntax error in line %d: opened bracket expected\n", lineNum);
+			printf("Syntax error in line %d: opened bracket expected\n", lineNum);
 		}
 	}
 }
@@ -724,22 +728,22 @@ void forcase_stat(){
 						brack_or_stat();
 					}
 					else{
-						perror("Syntax error in line %d: closed parenthesis expected\n", lineNum);
+						printf("Syntax error in line %d: closed parenthesis expected\n", lineNum);
 					}
 				}
 				else{
-					perror("Syntax error in line %d: opened parenthesis expected\n", lineNum);
+					printf("Syntax error in line %d: opened parenthesis expected\n", lineNum);
 				}
 			}
 			if (id == CLOSE_BRAC){
 				id = lex(fp);
 			}
 			else{
-				perror("Syntax error in line %d: closed bracket expected\n", lineNum);
+				printf("Syntax error in line %d: closed bracket expected\n", lineNum);
 			}
 		}
 		else{
-			perror("Syntax error in line %d: opened bracket expected\n", lineNum);
+			printf("Syntax error in line %d: opened bracket expected\n", lineNum);
 		}
 	}
 }
@@ -756,19 +760,19 @@ void call_stat(){
 					id = lex(fp);
 				}
 				else{
-					perror("Syntax error in line %d: closed parenthesis expected\n", lineNum);
+					printf("Syntax error in line %d: closed parenthesis expected\n", lineNum);
 				}
 			}
 			else{
-				perror("Syntax error in line %d: opened parenthesis expected\n", lineNum);
+				printf("Syntax error in line %d: opened parenthesis expected\n", lineNum);
 			}
 		}
 		else{
-			perror("Syntax error in line %d: ID expected\n", lineNum);
+			printf("Syntax error in line %d: ID expected\n", lineNum);
 		}
 	}
 	else{
-		perror("Syntax error in line %d: \"call\" keyword expected\n", lineNum);
+		printf("Syntax error in line %d: \"call\" keyword expected\n", lineNum);
 	}
 }
 
@@ -780,7 +784,7 @@ void actualpars(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected closed parenthesis\n", lineNum);
+			printf("Syntax error in line %d: expected closed parenthesis\n", lineNum);
 		}
 	}
 }
@@ -804,7 +808,7 @@ void actualparitem(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected ID after \"inout\"\n", lineNum);
+			printf("Syntax error in line %d: expected ID after \"inout\"\n", lineNum);
 		}
 	}
 	else if (id == COPY){
@@ -813,7 +817,7 @@ void actualparitem(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected ID after \"copy\"\n", lineNum);
+			printf("Syntax error in line %d: expected ID after \"copy\"\n", lineNum);
 		}
 	}
 }
@@ -850,25 +854,25 @@ void boolfactor(){
 	if (id == NOT){
 		id = lex(fp);
 		if (id == OSQUARE_BRAC){
-			conditon();
+			condition();
 			if (id == CSQUARE_BRAC){
 				id = lex(fp);
 			}
 			else{
-				perror("Syntax error in line %d: expected ]\n", lineNum);
+				printf("Syntax error in line %d: expected ]\n", lineNum);
 			}
 		}
 		else{
-			perror("Syntax error in line %d: expected [\n", lineNum);
+			printf("Syntax error in line %d: expected [\n", lineNum);
 		}
 	}
 	else if (id == OSQUARE_BRAC){
-		conditon();
+		condition();
 		if (id == CSQUARE_BRAC){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected ]\n", lineNum);
+			printf("Syntax error in line %d: expected ]\n", lineNum);
 		}
 	}
 	else{
@@ -882,11 +886,9 @@ void expression(){
 	optional_sign();
 	term();
 	while (id == PLUS || id == MINUS){
-		addoper();
+		add_oper();
 		term();
 	}
-	
-
 }
 
 void term(){
@@ -900,6 +902,7 @@ void term(){
 }
 
 void factor(){
+    //id=lex(fp);
 	if (id == CONSTANTID){
 		id = lex(fp);
 	}
@@ -909,14 +912,14 @@ void factor(){
 			id = lex(fp);
 		}
 		else{
-			perror("Syntax error in line %d: expected )\n", lineNum);
+			printf("Syntax error in line %d: expected )\n", lineNum);
 		}
 	}
 	else if (id == ID){
 		idtail();
 	}
 	else{
-		perror("Syntax error in line %d: contstant | () | ID\n", lineNum);
+		printf("Syntax error in line %d: contstant | () | ID\n", lineNum);
 	}
 }
 
@@ -969,31 +972,21 @@ void optional_sign(){
 
 
 
+int main(int argc, char *argv[]){
 
-
-
-
-/*int main(int argc, char *argv[]){
-
-	FILE *fp;
-
-	int token;
 	if (argc < 2){
 		exit(1);
 	}
 	printf("%s",argv[1]);
 
 	fp = fopen(argv[1], "r");
-	token = lex(fp);
-	printf("%d",token);
-	printf("	/t ");
-	
-	while (token >= 0){
-		token = lex(fp);		
+
+	 /*while (token >= 0){
+		token = lex(fp);
 		printf("  %d",token);
 		printf("\t ");
+	} */
 
-	}
+	programtk();
 	fclose(fp);
-
-}*/
+}
