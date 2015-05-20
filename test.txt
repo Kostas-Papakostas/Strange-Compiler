@@ -1,0 +1,10 @@
+program tade{
+	declare a enddeclare
+
+
+	function alpha (in a,inout b){
+			function beta (in c,inout b){
+					a:=5;
+			}		
+	}
+}
