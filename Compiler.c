@@ -15,7 +15,7 @@ void boolfactor(struct list *Qtrue, struct list *Qfalse);
 int lineNum = 0, itemp = 0, jtemp = 0,nesting=0;
 int state = state0;
 int quadnum = 100;
-int id, i, token,place=0;
+int id, i, token,place=0,numofargs=0;         // numofargs is the number of arguments
 char lexis[500];
 char progname[500];
 char c, b;
@@ -28,7 +28,7 @@ struct Entity{
 	int type;
 	int offset;
 	int startquad;
-	int framelenght;
+	int framelength;
 	char value[500];
 	int parMode;
 	struct Argument *arg;
@@ -120,6 +120,8 @@ struct Entity *searchEntity(char name[])
 	struct Entity *enlist;
 	struct scope *scop; 
 
+	printf("the fight calls me");
+
 	scop = scopehead;
 	while (scop != NULL){
 		enlist = scop->en;
@@ -129,8 +131,10 @@ struct Entity *searchEntity(char name[])
 				return enlist;
 			}
 			enlist = enlist->nextEntity;
+			printf("enlist name 2 %s\n", enlist->name);
 		}
 		scop = scop->NextScope;
+		printf("enlist name 3 %s\n", enlist->name);
 	}
 	return NULL;
 
@@ -168,19 +172,19 @@ void addArguments(char name[],int ty,int ParM){
 	struct Argument *current,*previous,*head;
 	struct Entity *e;
 	int i = 0;
-	current = (struct Argument*)malloc(sizeof(struct Argument));
+	head = (struct Argument*)malloc(sizeof(struct Argument));
 	e = searchEntity(name);
-	current->type=ty;
-	current->parMode=ParM;
+	//current->type=ty;
+	//current->parMode=ParM;
 	
 	head = e->arg;
 
-	if (head == NULL){
+	//if (head == NULL){
 		head->parMode = ParM;
 		head->type = ty;
-		current->nextarg = NULL;
-	}
-	while (head!=NULL){
+		//current->nextarg = NULL;
+	//}
+	/*while (head!=NULL){
 		head = head->nextarg;
 	}
 	head->parMode = ParM;
@@ -188,8 +192,8 @@ void addArguments(char name[],int ty,int ParM){
 	
 	head->nextarg =head;
 	head = NULL;
-	
-
+	*/
+		i++;
 }
 ////////////////////////////////////////Symbols Table///////////////////////////////////////////////////
 
@@ -219,7 +223,10 @@ void gnlvcode(char *var){
 	f1 = fopen("endcode.txt","a");
 	struct Entity *off;
 	struct Entity *res = searchEntity(var);
+	
 	fprintf(f1,"movi R[255], M[4+R[0]]\n");
+
+
 	current_nest_lvl = scopehead->nestinglvl;			// current nesting lvl
 	founded_nest_lvl = scopehead->NextScope->nestinglvl;   
 	off = res->nextEntity;
@@ -240,10 +247,11 @@ void loadvr(char *v, int r){
 	struct Entity *res = searchEntity(v);
 	f1 = fopen("endcode.txt", "a");
 	temp = IDget(v);
-	
+	printf("MY ID IS %d\n", temp);
 	if (temp == NUMERIC){
 		fprintf(f1, "movi R[%d],%s\n", r, v);
 	}
+
 	current_nest_lvl = scopehead->nestinglvl;
 	founded_nest_lvl = scopehead->NextScope->nestinglvl;
 	off = res->nextEntity;
@@ -253,20 +261,20 @@ void loadvr(char *v, int r){
 		fprintf(f1, "movi R[%d],M[%d]\n", r, 600 + founded_offset);
 	}
 	else if (current_nest_lvl == founded_nest_lvl){
-		if (res->parMode != REF){						// the variable is passed with value
+		if (res->parMode == IN){						// the variable is passed with value
 			fprintf(f1, "movi R[%d],M[%d+R[0]]\n", r, founded_offset);
 		}
-		else if (res->parMode == REF){					// the variable is passed with reference
+		else if (res->parMode == INOUT){					// the variable is passed with reference
 			fprintf(f1, "movi R[255],M[%d+R[0]]\n", founded_offset);
 			fprintf(f1, "movi R[%d],M[R[255]]\n", r);
 		}
 	}
 	else if (current_nest_lvl > founded_nest_lvl){
 		gnlvcode(v);
-		if (res->parMode != REF){
+		if (res->parMode == IN){
 			fprintf(f1, "movi R[%d],M[R[255]]", r);
 		}
-		else if (res->parMode == REF){
+		else if (res->parMode == INOUT){
 			fprintf(f1, "movi R[255],M[R[255]]\n", r);
 			fprintf(f1, "movi R[%d],M[R[255]]\n", r);
 		}
@@ -277,6 +285,9 @@ void loadvr(char *v, int r){
 void storerv(int r,char *v){
 	int temp, current_nest_lvl, founded_nest_lvl, founded_offset;
 	struct Entity *res = searchEntity(v);
+	struct Entity *off;
+
+
 	current_nest_lvl = scopehead->nestinglvl;
 	founded_nest_lvl = scopehead->NextScope->nestinglvl;
 	off = res->nextEntity;
@@ -286,29 +297,159 @@ void storerv(int r,char *v){
 		fprintf(f1, "movi M[%d],R[%d]\n", 600 + founded_offset,r);
 	}
 	else if (current_nest_lvl == founded_nest_lvl){
-		if (res->parMode != REF){						// the variable is passed with value
+		if (res->arg->parMode == IN){						// the variable is passed with value
 			fprintf(f1, "movi M[%d+R[0]],R[%d]\n", founded_offset, r);
 		}
-		else if (res->parMode == REF){					// the variable is passed with reference
+		else if (res->arg->parMode == INOUT){					// the variable is passed with reference
 			fprintf(f1, "movi R[255],M[%d+R[0]]\n", founded_offset);
 			fprintf(f1, "movi M[R[255]],R[%d]\n", r);
 		}
 	}
-	else if (current_nest_lvl > founded_nest_lvl){
+	else if (current_nest_lvl > founded_nest_lvl && res->arg->parMode == IN){
 		gnlvcode(v);
-		if (res->parMode != REF){
-			fprintf(f1, "movi M[R[255]],R[%d]", r);
+		fprintf(f1, "movi M[R[255]],R[%d]", r);
+	}
+	else if (current_nest_lvl > founded_nest_lvl && res->arg->parMode == INOUT){
+		gnlvcode(v);
+		fprintf(f1, "movi R[255],M[R[255]]\n", r);
+		fprintf(f1, "movi M[R[255]],R[%d]\n", r);
+	}
+	
+	fclose(f1);
+}
+
+void jumpOrders(struct quad *q){
+	char tempo[100], tempx[100], tempy[100], tempz[100];
+	int current_nest_lvl, founded_nest_lvl, founded_offset,d=0;
+	struct Entity *res = searchEntity(tempx),*off;
+	d = res->framelength + 12 + (4 * i);
+	f1 = fopen("endcode.txt", "a");
+	strcpy(tempo, q->op);
+	strcpy(tempx, q->x);
+	strcpy(tempy, q->y);
+	strcpy(tempz, q->z);
+	
+	current_nest_lvl = scopehead->nestinglvl;
+	founded_nest_lvl = scopehead->NextScope->nestinglvl;
+	off = res->nextEntity;
+	founded_offset = off->offset;
+
+	if (strcmp(tempo, "jump") == 0 && strcmp(tempx, "_") == 0 && strcmp(tempy, "_") == 0){
+		fprintf(f1,"jmp L%s \n",tempz);
+	}
+	else if (strcmp(tempo, "=") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "cmpi R[1],R[2] \n");
+		fprintf(f1, "je L%s \n",tempz);
+	}
+	else if (strcmp(tempo, "<>") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "cmpi R[1],R[2] \n");
+		fprintf(f1, "jne L%s \n", tempz);
+	}
+	else if (strcmp(tempo, ">") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "cmpi R[1],R[2] \n");
+		fprintf(f1, "jb L%s \n", tempz);
+	}
+	else if (strcmp(tempo, ">=") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "cmpi R[1],R[2] \n");
+		fprintf(f1, "jbe L%s \n", tempz);
+	}
+	else if (strcmp(tempo, "<") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "cmpi R[1],R[2] \n");
+		fprintf(f1, "ja L%s \n", tempz);
+	}
+	else if (strcmp(tempo, "<=") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "cmpi R[1],R[2] \n");
+		fprintf(f1, "jae L%s \n", tempz);
+	}
+	else if (strcmp(tempo, ":=") == 0){
+		loadvr(tempx, 1);
+		storerv(1, tempz);
+	}
+	else if (strcmp(tempo, "+") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "addi R[3],R[1],R[1] \n");
+		storerv(3, tempz);
+	}
+	else if (strcmp(tempo, "-") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "subi R[3],R[1],R[1] \n");
+		storerv(3, tempz);
+	}
+	else if (strcmp(tempo, "*") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "muli R[3],R[1],R[1] \n");
+		storerv(3, tempz);
+	}
+	else if (strcmp(tempo, "/") == 0){
+		loadvr(tempx, 1);
+		loadvr(tempy, 2);
+		fprintf(f1, "divi R[3],R[1],R[1] \n");
+		storerv(3, tempz);
+	}
+
+	else if (strcmp(tempo, "print") == 0){
+		loadvr(tempx, 1);
+		fprintf(f1, "outi R[1] \n");
+	}
+	else if (strcmp(tempo, "par") == 0 && strcmp(tempy,"cv")){
+		loadvr(tempx, 255);
+		fprintf(f1, "movi M[%d + R[0]],R[255]",d);
+	
+	}
+	else if (strcmp(tempo,"par")==0 && current_nest_lvl==founded_nest_lvl){
+		if (res->arg->parMode==IN){
+			fprintf(f1, "movi R[255],R[0]\n");
+			fprintf(f1, "movi R[254],%d\n", founded_offset);
+			fprintf(f1, "addi R[255],R[254],R[255]\n");
+			fprintf(f1, "movi M[%d+R[0]],R[255]\n",d);
 		}
-		else if (res->parMode == REF){
-			fprintf(f1, "movi R[255],M[R[255]]\n", r);
-			fprintf(f1, "movi M[R[255]],R[%d]\n", r);
+		else if (res->arg->parMode == INOUT){
+			fprintf(f1, "movi R[255],R[0]\n");
+			fprintf(f1, "movi R[254],%d\n", founded_offset);
+			fprintf(f1, "addi R[255],R[254],R[255]\n");
+			fprintf(f1, "movi R[1],M[R[255]]\n");
+			fprintf(f1, "movi M[%d+R[0]],R[1]\n",d);
+		}
+
+	}
+	else if (strcmp(tempo, "par") == 0 && current_nest_lvl != founded_nest_lvl){
+		if (res->arg->parMode != IN){
+			gnlvcode(tempx);
+			fprintf(f1, "movi M[%d+R[0]],R[255]\n",d);
+		}
+		else if (res->arg->parMode == INOUT){
+			gnlvcode(tempx);
+			fprintf(f1, "movi R[1],M[R[255]]\n");
+			fprintf(f1, "movi M[%d+R[0]],R[1]\n",d);
 		}
 	}
-	fclose(f1);
+	else if (strcmp(tempo, "par") == 0 && strcmp(tempy, "ret") == 0){
+		fprintf(f1, "movi R[255],R[0]\n");
+		fprintf(f1, "movi R[254],%d\n", founded_offset);
+		fprintf(f1, "addi R[255],R[254],R[255]\n");
+		fprintf(f1, "movi M[%d+8+R[0]],R[255]", res->framelength);
+	}
+
+
 }
 /*########### end code ##############*/
 
-
+	
 // ############ lexical analysis ##############
 FILE *fp;
 int isAcceptable(char c)
@@ -627,6 +768,7 @@ int lex(FILE *fp){
 
 // ############################   syntax analysis ###############################
 void programtk(){
+	f1 = fopen("endcode.txt", "a");
 	id = lex(fp);
 	if (id == PROGRAM){
 		id = lex(fp);
@@ -638,13 +780,14 @@ void programtk(){
 			id = lex(fp);
 
 			createScope();
-
+			fprintf(f1, "jmp L%d",nextquad());
 			block(&progname);
+
 
 			
 
 			genquad("halt", "_", "_", "_");
-
+			fprintf(f1, "halt\n");
 			//print_table();
 			deleteScope();
 		}
@@ -659,7 +802,7 @@ void programtk(){
 
 void block(char *progname){
 
-
+	f1 = fopen("endcode.txt", "a");
 	if (id == OPEN_BRAC){
 		id = lex(fp);
 		declarations();
@@ -669,6 +812,7 @@ void block(char *progname){
 		genquad("begin_block", progname, "_", "_");
 		sequence();
 		genquad("end_block", progname, "_", "_");
+		fprintf(f1,"jmp M[R[0]]\n");
 		if (id == CLOSE_BRAC){
 			id = lex(fp);
 		}
@@ -700,7 +844,7 @@ void varlist(){
 	if (id == ID){
 
 		insertEntity(lexis, NUMERIC, nextquad());
-
+		addArguments("alpha", NUMERIC, IN);
 		id = lex(fp);
 		while (id == COMMA){
 			id = lex(fp);
@@ -902,12 +1046,13 @@ void statement(){
 void assignment_stat(){
 
 	char e[500];
-	char name[100];
+	char name[100];			//name of variable
 	if (id == ID){
 		strcpy(name, lexis);
 		id = lex(fp);
 		if (id == DECL_EQUALS){
 			expression(&e);
+			storerv(4, name);
 			genquad(":=", e, "_", name);
 		}
 		else{
@@ -1436,6 +1581,7 @@ void relational_oper(char *t){
 
 void add_oper(){
 	if (id == PLUS){
+
 		id = lex(fp);
 	}
 	if (id == MINUS){
@@ -1623,9 +1769,9 @@ int main(int argc, char *argv[]){
 
 	struct list *list1, *list2;
 	fp = fopen("test.txt", "r");
-
+	f1 = fopen("endcode.txt", "w");
 	programtk();
-
+	
 
 	f = fopen("2342_2399_test1.txt", "w");
 
@@ -1639,7 +1785,7 @@ int main(int argc, char *argv[]){
 	printlist(head);
 	fclose(f);
 	fclose(fp);
-	loadvr("CONSTANT", 400);
+	
 	//gnlvcode("5");
 	system("PAUSE");
 }
