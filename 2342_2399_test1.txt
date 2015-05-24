@@ -1,8 +1,0 @@
- begin_block  tade  _  _ 
- :=  :=  _  a 
- end_block  tade  _  _ 
- begin_block  tade  _  _ 
- end_block  tade  _  _ 
- begin_block  tade  _  _ 
- end_block  tade  _  _ 
- halt  _  _  _ 

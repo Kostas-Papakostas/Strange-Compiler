@@ -5,11 +5,63 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
-#include "Symbols.h"
 
-void condition(struct list *Etrue, struct list *Efalse);
-void boolterm(struct list *Btrue, struct list *Bfalse);
-void boolfactor(struct list *Qtrue, struct list *Qfalse);
+enum tokens{
+	EQUALS, PLUS, MULTIPLY, DIVIDE, MINUS, LESS_THAN, GREATER_THAN
+	, SEMI_COL, COMMA, OPEN_PAR, CLOSE_PAR, OPEN_BRAC, CLOSE_BRAC, AND, OR, NOT, IN
+	, IF, ELSE, DO, WHILE, FORCASE, INCASE, WHEN, PRINT, RETURN, CALL, FUNCTION, LESS_EQ, GREATER_EQ, ID, NUMERIC, EXIT,
+	PROCEDURE, INOUT, PROGRAM, COPY, OSQUARE_BRAC, CSQUARE_BRAC, DECL_EQUALS, DIFFERENT, DECLARE, ENDDECLARE, CONSTANTID,REF
+};
+enum states{
+	state0, state1, state2, state3
+	, state4, state5, state6, OK, ERROR
+};
+
+void programtk();
+void block();
+void declarations();
+void varlist();
+void subprogram();
+void func();
+void funcbody();
+void formalpars();
+void formalparlist();
+void formalparitem();
+void sequence();
+void brackets_seq();
+void brack_or_stat();
+void statement();
+void assignment_stat();
+void if_stat();
+void elsepart();
+void do_while_stat();
+void exit_stat();
+void return_stat();
+void print_stat();
+void while_stat();
+void incase_stat();
+void forcase_stat();
+void call_stat();
+void actualpars();
+void actualparlist();
+void actualparitem();
+void expression(char *e);
+void term(char *t);
+void factor(char *t);
+void idtail();
+void relational_oper();
+void add_oper();
+void mul_oper();
+void optional_sign();
+int nextquad();
+struct quad genquad(char *a, char  *x, char *y, char *z);
+struct list* makelist(struct quad* x);
+struct list* mergelist(struct list *list1, struct list *list2);
+void backpatch(struct list *list1, int x);
+void printlist(struct list *list1);
+struct list * emptylist();
+const char * newTemp();
+
 
 
 int lineNum = 0, itemp = 0, jtemp = 0,nesting=0;
@@ -21,6 +73,25 @@ char progname[500];
 char c, b;
 FILE *f,*f1;
 char t[50];
+
+struct quad {
+	char *op;
+	char *x;
+	char *y;
+	char *z;
+
+};
+
+struct list
+{
+
+	struct quad *q;
+	struct list *next;
+
+};
+
+struct list *head = NULL;
+struct list *curr = NULL;
 
 ////////////////////////////////////////Symbols Table///////////////////////////////////////////////////
 struct Entity{
@@ -85,6 +156,7 @@ void insertEntity(char n[],int ty,int start){
 	struct Entity *previous, *current;
 
 	int off=0;
+	
 	enlist = (struct Entity*)malloc(sizeof(struct Entity));
 	if (enlist == NULL){
 		printf("couldn't allocate memory\n");
@@ -94,6 +166,7 @@ void insertEntity(char n[],int ty,int start){
 	enlist->type = ty;
 	enlist->startquad = start;
 	enlist->nextEntity = NULL;
+	enlist->framelength = 12;
 
 	previous = NULL;
 	current = scopehead->en;
@@ -102,8 +175,9 @@ void insertEntity(char n[],int ty,int start){
 		if (ty != FUNCTION && ty!=PROCEDURE){
 			off = previous->offset;
 		}
+		
+		current->framelength = previous->framelength + 4;
 		current = current->nextEntity;
-
 	}
 	if (previous == NULL){
 		scopehead->en = enlist;
@@ -120,21 +194,20 @@ struct Entity *searchEntity(char name[])
 	struct Entity *enlist;
 	struct scope *scop; 
 
-	printf("the fight calls me");
+	
 
 	scop = scopehead;
 	while (scop != NULL){
 		enlist = scop->en;
 		while (enlist != NULL){
 			if (strcmp(enlist->name, name) == 0){
-				printf("enlist name %s\n",enlist->name);
 				return enlist;
 			}
 			enlist = enlist->nextEntity;
-			printf("enlist name 2 %s\n", enlist->name);
+
 		}
 		scop = scop->NextScope;
-		printf("enlist name 3 %s\n", enlist->name);
+
 	}
 	return NULL;
 
@@ -171,92 +244,85 @@ void print_table()
 void addArguments(char name[],int ty,int ParM){
 	struct Argument *current,*previous,*head;
 	struct Entity *e;
+	char *tempnam;
+	tempnam = (char*)malloc(strlen(name)*sizeof(char));
+	strcpy(tempnam, name);
 	int i = 0;
 	head = (struct Argument*)malloc(sizeof(struct Argument));
-	e = searchEntity(name);
-	//current->type=ty;
-	//current->parMode=ParM;
+	current = (struct Argument*)malloc(sizeof(struct Argument));
 	
-	head = e->arg;
+	e = searchEntity(tempnam);
+	current->type=ty;
+	current->parMode=ParM;
 
-	//if (head == NULL){
+	if (head == NULL){
 		head->parMode = ParM;
 		head->type = ty;
-		//current->nextarg = NULL;
-	//}
-	/*while (head!=NULL){
-		head = head->nextarg;
+		current->nextarg = NULL;
 	}
+	//while (head!=NULL){
+		//head = head->nextarg;
+	//}
 	head->parMode = ParM;
 	head->type = ty;
 	
 	head->nextarg =head;
 	head = NULL;
-	*/
+	
 		i++;
 }
 ////////////////////////////////////////Symbols Table///////////////////////////////////////////////////
 
-struct quad {
-	char *op;
-	char *x;
-	char *y;
-	char *z;
 
-};
-
-struct list
-{
-
-	struct quad *q;
-	struct list *next;
-
-};
-
-struct list *head = NULL;
-struct list *curr = NULL;
 
 /*########### end code ##############*/
 
 void gnlvcode(char *var){
 	int current_nest_lvl,founded_nest_lvl,founded_offset;
-	f1 = fopen("endcode.txt","a");
-	struct Entity *off;
+//	f1 = fopen("endcode.txt","a");
 	struct Entity *res = searchEntity(var);
-	
+	fprintf(f1, "\n");
+	fprintf(f1, "\n      ");
+	//fprintf(f1, "\n");
 	fprintf(f1,"movi R[255], M[4+R[0]]\n");
 
 
 	current_nest_lvl = scopehead->nestinglvl;			// current nesting lvl
 	founded_nest_lvl = scopehead->NextScope->nestinglvl;   
-	off = res->nextEntity;
-	founded_offset = off->offset;					//find the offset of the variable
+	
 
 	while (current_nest_lvl != founded_nest_lvl){
 		fprintf(f1, "movi R[255], M[4+R[255]]\n");
 		founded_nest_lvl++;
+	}if (res != NULL){
+		founded_offset = res->offset;			//find the offset of the variable
+		fprintf(f1, "movi R[255],%d\n", founded_offset);		
 	}
-	fprintf(f1, "movi R[255],%d\n", founded_offset);
+	
 	fprintf(f1, "addi R[255], R[254], R[255]\n");
-	fclose(f1);
+
 }
 
 void loadvr(char *v, int r){
 	int temp, current_nest_lvl, founded_nest_lvl, founded_offset;
-	struct Entity *off;
 	struct Entity *res = searchEntity(v);
-	f1 = fopen("endcode.txt", "a");
+	/*f1 = fopen("endcode.txt", "w+");
+
+
+	if (f1 == NULL){
+		printf("error opening file endcode.txt");
+		exit(1);
+	}*/
 	temp = IDget(v);
-	printf("MY ID IS %d\n", temp);
 	if (temp == NUMERIC){
 		fprintf(f1, "movi R[%d],%s\n", r, v);
 	}
 
 	current_nest_lvl = scopehead->nestinglvl;
 	founded_nest_lvl = scopehead->NextScope->nestinglvl;
-	off = res->nextEntity;
-	founded_offset = off->offset;
-	
+	if (res != NULL){
+		founded_offset = res->offset;
+	}
 	if (current_nest_lvl == 0){								//check if the variable is global
 		fprintf(f1, "movi R[%d],M[%d]\n", r, 600 + founded_offset);
 	}
@@ -279,19 +345,22 @@ void loadvr(char *v, int r){
 			fprintf(f1, "movi R[%d],M[R[255]]\n", r);
 		}
 	}
-	fclose(f1);
+	//fclose(f1);
 }
 
 void storerv(int r,char *v){
 	int temp, current_nest_lvl, founded_nest_lvl, founded_offset;
 	struct Entity *res = searchEntity(v);
-	struct Entity *off;
+	/*f1 = fopen("endcode.txt", "w+");
+	
 
-
+	if (f1 == NULL){
+		printf("error opening file endcode.txt");
+		exit(1);
+	}*/
 	current_nest_lvl = scopehead->nestinglvl;
 	founded_nest_lvl = scopehead->NextScope->nestinglvl;
-	off = res->nextEntity;
-	founded_offset = off->offset;
+	founded_offset = res->offset;
 
 	if (current_nest_lvl == 0){								//check if the variable is global
 		fprintf(f1, "movi M[%d],R[%d]\n", 600 + founded_offset,r);
@@ -305,36 +374,45 @@ void storerv(int r,char *v){
 			fprintf(f1, "movi M[R[255]],R[%d]\n", r);
 		}
 	}
-	else if (current_nest_lvl > founded_nest_lvl && res->arg->parMode == IN){
+	else if (current_nest_lvl > founded_nest_lvl && res->parMode == IN){
 		gnlvcode(v);
 		fprintf(f1, "movi M[R[255]],R[%d]", r);
 	}
-	else if (current_nest_lvl > founded_nest_lvl && res->arg->parMode == INOUT){
+	else if (current_nest_lvl > founded_nest_lvl && res->parMode == INOUT){
 		gnlvcode(v);
 		fprintf(f1, "movi R[255],M[R[255]]\n", r);
 		fprintf(f1, "movi M[R[255]],R[%d]\n", r);
 	}
 	
-	fclose(f1);
+	//fclose(f1);
 }
 
-void jumpOrders(struct quad *q){
+void endCode(struct quad *q){
 	char tempo[100], tempx[100], tempy[100], tempz[100];
 	int current_nest_lvl, founded_nest_lvl, founded_offset,d=0;
-	struct Entity *res = searchEntity(tempx),*off;
-	d = res->framelength + 12 + (4 * i);
-	f1 = fopen("endcode.txt", "a");
+	struct Entity *res;
+	
+	/*f1 = fopen("endcode.txt", "w+");
+	if (f1 == NULL){
+		printf("error opening file endcode.txt");
+		exit(1);
+	}*/
 	strcpy(tempo, q->op);
 	strcpy(tempx, q->x);
 	strcpy(tempy, q->y);
 	strcpy(tempz, q->z);
-	
+
+
+	res = searchEntity(tempz);
+	d = res->framelength + 12 + (4 * i);
+
 	current_nest_lvl = scopehead->nestinglvl;
 	founded_nest_lvl = scopehead->NextScope->nestinglvl;
-	off = res->nextEntity;
-	founded_offset = off->offset;
+	if (res != NULL){
+		founded_offset = res->offset;
+	}
 
-	if (strcmp(tempo, "jump") == 0 && strcmp(tempx, "_") == 0 && strcmp(tempy, "_") == 0){
+	if (strcmp(tempo, "jump") == 0 ){
 		fprintf(f1,"jmp L%s \n",tempz);
 	}
 	else if (strcmp(tempo, "=") == 0){
@@ -374,7 +452,7 @@ void jumpOrders(struct quad *q){
 		fprintf(f1, "jae L%s \n", tempz);
 	}
 	else if (strcmp(tempo, ":=") == 0){
-		loadvr(tempx, 1);
+		loadvr(tempz, 1);
 		storerv(1, tempz);
 	}
 	else if (strcmp(tempo, "+") == 0){
@@ -406,7 +484,15 @@ void jumpOrders(struct quad *q){
 		loadvr(tempx, 1);
 		fprintf(f1, "outi R[1] \n");
 	}
-	else if (strcmp(tempo, "par") == 0 && strcmp(tempy,"cv")){
+	else if (strcmp(tempo, "out") == 0){
+		loadvr(tempx, 1);
+		fprintf(f1, "outi R[1]");
+	}
+	else if (strcmp(tempo, "in") == 0){
+		fprintf(f1, "ini R[1]");
+		storerv(1, tempx);
+	}
+	else if (strcmp(tempo, "par") == 0 && strcmp(tempy,"cv")){				//parametre with copy value
 		loadvr(tempx, 255);
 		fprintf(f1, "movi M[%d + R[0]],R[255]",d);
 	
@@ -427,7 +513,12 @@ void jumpOrders(struct quad *q){
 		}
 
 	}
-	else if (strcmp(tempo, "par") == 0 && current_nest_lvl != founded_nest_lvl){
+	else if (strcmp(tempo, ":=") == 0 && strcmp(tempz, "retv") == 0){			//return value to 'x'
+		loadvr(tempx, 1);
+		fprintf(f1, "movi R[255],M[8+R[0]]\n");
+		fprintf(f1, "M[R[255]],R[1]\n");
+	}
+	else if (strcmp(tempo, "par") == 0 && current_nest_lvl != founded_nest_lvl){				//parametre values
 		if (res->arg->parMode != IN){
 			gnlvcode(tempx);
 			fprintf(f1, "movi M[%d+R[0]],R[255]\n",d);
@@ -442,9 +533,29 @@ void jumpOrders(struct quad *q){
 		fprintf(f1, "movi R[255],R[0]\n");
 		fprintf(f1, "movi R[254],%d\n", founded_offset);
 		fprintf(f1, "addi R[255],R[254],R[255]\n");
-		fprintf(f1, "movi M[%d+8+R[0]],R[255]", res->framelength);
+		fprintf(f1, "movi M[%d+8+R[0]],R[255]\n", res->framelength);
 	}
+	else if (strcmp(tempo, "call") == 0){								//call of a function
+		if (current_nest_lvl == founded_nest_lvl){
 
+			fprintf(f1, "movi R[255],M[4+R[0]]\n");
+			fprintf(f1, "M[%d+4+R[0]],R[255]\n", res->framelength);
+		}
+		else if (current_nest_lvl < founded_nest_lvl){
+			fprintf(f1, "M[%d+4+R[0]],R[0]\n", res->framelength);
+		}
+
+		fprintf(f1, "R[255],%d\n", res->framelength);
+		fprintf(f1, "addi R[0],R[255],R[0]\n");
+		fprintf(f1, "movi R[255],$\n");
+		fprintf(f1, "movi R[254],15\n");
+		fprintf(f1, "addi R[255],R[255],R[254]\n");
+		fprintf(f1, "movi M[R[0]],R[255]\n");
+		fprintf(f1, "L%d\n", res->startquad);
+		fprintf(f1, "R[255],%d\n", res->framelength);
+		fprintf(f1, "subi R[0],R[0],R[255]\n");
+	}
+	//fclose(f1);
 
 }
 /*########### end code ##############*/
@@ -768,7 +879,8 @@ int lex(FILE *fp){
 
 // ############################   syntax analysis ###############################
 void programtk(){
-	f1 = fopen("endcode.txt", "a");
+	struct quad *myquad = malloc(sizeof(struct quad) + 1);
+	//f1 = fopen("endcode.txt", "w+");
 	id = lex(fp);
 	if (id == PROGRAM){
 		id = lex(fp);
@@ -776,19 +888,16 @@ void programtk(){
 
 			strcpy(progname, lexis);
 
-
 			id = lex(fp);
 
 			createScope();
-			fprintf(f1, "jmp L%d",nextquad());
+			fprintf(f1, "jmp L%d\n",nextquad());
 			block(&progname);
 
-
-			
-
-			genquad("halt", "_", "_", "_");
 			fprintf(f1, "halt\n");
-			//print_table();
+			genquad("halt", "_", "_", "_");
+			
+			print_table();
 			deleteScope();
 		}
 		else{
@@ -798,6 +907,7 @@ void programtk(){
 	else{
 		printf("Syntax error in line %d: word \" program \" expected", lineNum);
 	}
+	//fclose(f1);
 }
 
 void block(char *progname){
@@ -844,14 +954,17 @@ void varlist(){
 	if (id == ID){
 
 		insertEntity(lexis, NUMERIC, nextquad());
-		addArguments("alpha", NUMERIC, IN);
+		addArguments(lexis, NUMERIC, IN);
 		id = lex(fp);
 		while (id == COMMA){
 			id = lex(fp);
 			if (id == ID){
-				id = lex(fp);
+				
 
 				insertEntity(lexis, NUMERIC, nextquad());
+				addArguments(lexis, NUMERIC, IN);
+				
+				id = lex(fp);
 
 			}
 			else{
@@ -1044,7 +1157,7 @@ void statement(){
 }
 
 void assignment_stat(){
-
+	struct quad myquad;// = malloc(sizeof(struct quad) + 1);
 	char e[500];
 	char name[100];			//name of variable
 	if (id == ID){
@@ -1052,8 +1165,8 @@ void assignment_stat(){
 		id = lex(fp);
 		if (id == DECL_EQUALS){
 			expression(&e);
-			storerv(4, name);
-			genquad(":=", e, "_", name);
+			myquad=genquad(":=", e, "_", name);
+			endCode(&myquad);
 		}
 		else{
 			printf("Syntax error in line %d: expected \":=\" after ID\n", lineNum);
@@ -1063,12 +1176,11 @@ void assignment_stat(){
 
 void if_stat(){
 	struct list *Btrue, *Bfalse, *iflist;
-
+	struct quad q;
 	Btrue = emptylist();
 	Bfalse = emptylist();
 	iflist = emptylist();
 
-	struct quad q;
 	if (id == IF){
 		id = lex(fp);
 		if (id == OPEN_PAR){
@@ -1079,6 +1191,7 @@ void if_stat(){
 				brack_or_stat();
 
 				q = genquad("jump", "_", "_", "_");
+				endCode(&q);
 				iflist = makelist(&q);
 				backpatch(Bfalse, nextquad());
 
@@ -1135,8 +1248,11 @@ void do_while_stat(){
 }
 
 void exit_stat(){
+	struct quad myquad;
 	if (id == EXIT){
-		genquad("exit", "_", "_", "_");
+
+		myquad=genquad("exit", "_", "_", "_");
+		endCode(&myquad);
 		id = lex(fp);
 	}
 	else{
@@ -1145,6 +1261,7 @@ void exit_stat(){
 }
 
 void return_stat(){
+	struct quad myquad;
 	char t[500];
 	if (id == RETURN){
 		id = lex(fp);
@@ -1152,8 +1269,8 @@ void return_stat(){
 		if (id == OPEN_PAR){
 			expression(&t);
 
-			genquad("retv", t, "_", "_");
-
+			myquad=genquad("retv", t, "_", "_");
+			endCode(&myquad);
 			if (id == CLOSE_PAR){
 				id = lex(fp);
 			}
@@ -1167,6 +1284,7 @@ void return_stat(){
 	}
 }
 void print_stat(){
+	struct quad myquad;
 	char t[500];
 	if (id == PRINT){
 		id = lex(fp);
@@ -1174,8 +1292,8 @@ void print_stat(){
 
 			expression(&t);
 
-			genquad("out", term, "_", "_");
-
+			myquad=genquad("out", term, "_", "_");
+			endCode(&myquad);
 			if (id == CLOSE_PAR){
 				id = lex(fp);
 			}
@@ -1190,7 +1308,7 @@ void print_stat(){
 }
 
 void while_stat(){
-
+	struct quad myquad;
 	struct list *Btrue, *Bfalse;
 	int Bquad = nextquad();
 
@@ -1207,7 +1325,8 @@ void while_stat(){
 
 				brack_or_stat();
 
-				genquad("jump", "_", "_", Bquad);
+				myquad=genquad("jump", "_", "_", Bquad);
+				endCode(&myquad);
 				backpatch(Bfalse, nextquad());
 
 			}
@@ -1223,6 +1342,7 @@ void while_stat(){
 }
 
 void incase_stat(){
+	struct quad myquad;
 	struct list *condtrue, *condfalse;
 
 	condtrue = emptylist();
@@ -1234,7 +1354,8 @@ void incase_stat(){
 			id = lex(fp);
 
 			pquad = nextquad();
-			genquad(":=", "1", "_", flag_);
+			myquad=genquad(":=", "1", "_", flag_);
+			endCode(&myquad);
 			while (id == WHEN){
 				id = lex(fp);
 				if (id == OPEN_PAR){
@@ -1243,7 +1364,8 @@ void incase_stat(){
 					if (id == CLOSE_PAR){
 
 						backpatch(condtrue, nextquad());
-						genquad(":=", "0", "_", "flag_");
+						myquad=genquad(":=", "0", "_", "flag_");
+						endCode(&myquad);
 						brack_or_stat();
 						backpatch(condfalse, nextquad());
 					}
@@ -1258,7 +1380,8 @@ void incase_stat(){
 			if (id == CLOSE_BRAC){
 				id = lex(fp);
 
-				genquad("=", "0", "flag_", pquad);
+				myquad=genquad("=", "0", "flag_", pquad);
+				endCode(&myquad);
 
 			}
 			else{
@@ -1274,6 +1397,7 @@ void incase_stat(){
 void forcase_stat(){
 	int start;
 	struct list *condtrue, *condfalse;
+	struct quad myquad;
 	condtrue = emptylist();
 	condfalse = emptylist();
 	if (id == FORCASE){
@@ -1291,7 +1415,8 @@ void forcase_stat(){
 					if (id == CLOSE_PAR){
 						backpatch(condtrue, nextquad());
 						brack_or_stat();
-						genquad("jump", "_", "_", start);
+						myquad=genquad("jump", "_", "_", start);
+						endCode(&myquad);
 						backpatch(condfalse, nextquad());
 					}
 					else{
@@ -1316,12 +1441,14 @@ void forcase_stat(){
 }
 
 void call_stat(){
+	struct quad myquad;
 	if (id == CALL){
 		id = lex(fp);
 		if (id == ID){
 
 			progname[100] = lexis;
-			genquad("call", progname, "_", "_");
+			myquad=genquad("call", progname, "_", "_");
+			endCode(&myquad);
 
 			id = lex(fp);
 			if (id == OPEN_PAR){
@@ -1370,20 +1497,20 @@ void actualparlist(){
 }
 
 void actualparitem(){
+	struct quad myquad;
 	char t[500];
 
 	if (id == IN){
 		expression(&t);
-		genquad("par", t, "ref", "_");
-
+		myquad=genquad("par", t, "ref", "_");
+		endCode(&myquad);
 		insertEntity(t, IN, nextquad());
-
 	}
 	else if (id == INOUT){
 		id = lex(fp);
 
-		genquad("par", t, "cv", "_");
-
+		myquad=genquad("par", t, "cv", "_");
+		endCode(&myquad);
 		insertEntity(t, INOUT, nextquad());
 
 		if (id == ID){
@@ -1397,8 +1524,8 @@ void actualparitem(){
 		id = lex(fp);
 		if (id == ID){
 			id = lex(fp);
-			genquad("par", t, "cp", "_");
-		
+			myquad=genquad("par", t, "cp", "_");
+			endCode(&myquad);
 			insertEntity(t, COPY, nextquad());
 
 
@@ -1497,6 +1624,7 @@ void boolfactor(struct list *Qtrue, struct list *Qfalse){
 }
 
 void expression(char *e){
+	struct quad myquad;
 	char term1[500], term2[500];
 	char *w;
 	optional_sign();
@@ -1512,7 +1640,8 @@ void expression(char *e){
 
 		insertEntity(w, 0, nextquad());
 
-		genquad("+", &term1, &term2, w);
+		myquad=genquad("+", &term1, &term2, w);
+		endCode(&myquad);
 		strcpy(term2, w);
 	}
 	strcpy(e, &term1);
@@ -1525,7 +1654,6 @@ void term(char *t){
 	while (id == MULTIPLY || id == DIVIDE){
 		mul_oper();
 		factor(&t);
-		//id = lex(fp);
 	}
 }
 
@@ -1770,9 +1898,6 @@ int main(int argc, char *argv[]){
 	struct list *list1, *list2;
 	fp = fopen("test.txt", "r");
 	f1 = fopen("endcode.txt", "w");
-	programtk();
-	
-
 	f = fopen("2342_2399_test1.txt", "w");
 
 
@@ -1780,13 +1905,21 @@ int main(int argc, char *argv[]){
 		printf("error opening file");
 		exit(1);
 	}
+	if (f1 == NULL){
+		printf("error opening file endcode.txt");
+		exit(1);
+	}
+	if (fp == NULL){
+		printf("error opening file test.txt");
+		exit(1);
+	}
 
+
+	programtk();
 
 	printlist(head);
 	fclose(f);
 	fclose(fp);
-	
-	//gnlvcode("5");
-	system("PAUSE");
+	fclose(f1);
 }
 
